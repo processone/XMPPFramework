@@ -179,12 +179,29 @@ NSString *const XMPPProcessOneSessionDate = @"XMPPProcessOneSessionDate";
 	return receipt;
 }
 
+// Rebind failed, reset rebind parameters
+- (void)xmppStream:(XMPPStream *)sender runFallbackAuthentication:(NSXMLElement *)error {
+    xmppStream.attemptingRebind = NO;
+    self.savedSessionID = nil;
+    self.savedSessionJID = nil;
+    self.savedSessionDate = nil;
+}
+
 - (void)xmppStreamDidAuthenticate:(XMPPStream *)sender
 {
-	if (!pushConfigurationSent)
-	{
-		[self sendPushConfiguration];
-	}
+    if (!xmppStream.isAttemptingRebind) {
+        if (!pushConfigurationSent)
+        {
+            [self sendPushConfiguration];
+        }
+        
+        // Store information we could use for rebind
+        NSString *streamID = [xmppStream rebindSessionID];
+        self.savedSessionID = streamID;
+        self.savedSessionJID = xmppStream.myJID;
+        self.savedSessionDate = [[NSDate alloc] init];
+    }
+    xmppStream.attemptingRebind = NO;
 }
 
 - (void)xmppStreamDidDisconnect:(XMPPStream *)sender withError:(NSError *)error
@@ -343,7 +360,7 @@ NSString *const XMPPProcessOneSessionDate = @"XMPPProcessOneSessionDate";
 	}
 	else
 	{
-		return XMPP_AUTH_FAIL;
+		return XMPP_AUTH_CAN_FALLBACK;
 	}
 }
 
@@ -360,6 +377,9 @@ NSString *const XMPPProcessOneSessionDate = @"XMPPProcessOneSessionDate";
 
 @implementation XMPPStream (XMPPProcessOne)
 
+@dynamic attemptingRebind;
+BOOL _attemptingRebind;
+
 - (BOOL)supportsPush
 {
 	__block BOOL result = NO;
@@ -374,15 +394,15 @@ NSString *const XMPPProcessOneSessionDate = @"XMPPProcessOneSessionDate";
 			NSXMLElement *push = [features elementForName:@"push" xmlns:@"p1:push"];
 			
 			result = (push != nil);
-		}
-	}};
+        }
+    }};
 
-	if (dispatch_get_specific(self.xmppQueueTag))
-		block();
-	else
-		dispatch_sync(self.xmppQueue, block);
-	
-	return result;
+    if (dispatch_get_specific(self.xmppQueueTag))
+        block();
+    else
+        dispatch_sync(self.xmppQueue, block);
+    
+    return result;
 }
 
 - (BOOL)supportsRebind
@@ -413,6 +433,51 @@ NSString *const XMPPProcessOneSessionDate = @"XMPPProcessOneSessionDate";
 - (NSString *)rebindSessionID
 {
 	return [[self rootElement] attributeStringValueForName:@"id"];
+}
+
+- (BOOL)rebindSession:(NSString *)sessionID forJID:(XMPPJID *)jid withError:(NSError **)errPtr {
+    __block BOOL result = YES;
+    __block NSError *err = nil;
+    
+    dispatch_block_t block = ^{ @autoreleasepool {
+        
+        if ([self supportsRebind])
+        {
+            self.attemptingRebind = YES;
+            XMPPRebindAuthentication *rebindAuth = [[XMPPRebindAuthentication alloc] initWithStream:self sessionID:sessionID sessionJID:jid];
+            
+            result = [self authenticate:rebindAuth error:&err];
+        }
+        else
+        {
+            NSString *errMsg = @"The server does not support rebind authentication.";
+            NSDictionary *info = @{NSLocalizedDescriptionKey : errMsg};
+            
+            err = [NSError errorWithDomain:XMPPStreamErrorDomain code:XMPPStreamUnsupportedAction userInfo:info];
+            
+            result = NO;
+        }
+    }};
+    
+    if (dispatch_get_specific(self.xmppQueueTag))
+        block();
+    else
+        dispatch_sync(self.xmppQueue, block);
+    
+    if (errPtr)
+        *errPtr = err;
+    
+    return result;
+}
+
+- (void)setAttemptingRebind:(BOOL)attemptingRebind
+{
+    _attemptingRebind = attemptingRebind;
+}
+
+- (BOOL)isAttemptingRebind
+{
+    return _attemptingRebind;
 }
 
 @end

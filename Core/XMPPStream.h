@@ -895,6 +895,12 @@ extern const NSTimeInterval XMPPStreamTimeoutNone;
 - (void)xmppStream:(XMPPStream *)sender didNotAuthenticate:(NSXMLElement *)error;
 
 /**
+ * This method is called if a primary authentication method fails.
+ * It gives the chance to the developer to call a secondary authentication methods.
+ **/
+- (void)xmppStream:(XMPPStream *)sender runFallbackAuthentication:(NSXMLElement *)error;
+
+/**
  * Binding a JID resource is a standard part of the authentication process,
  * and occurs after SASL authentication completes (which generally authenticates the JID username).
  * 

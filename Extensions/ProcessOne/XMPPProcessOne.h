@@ -109,9 +109,13 @@
 
 @interface XMPPStream (XMPPProcessOne)
 
+@property (nonatomic, assign, getter=isAttemptingRebind) BOOL attemptingRebind;
+
 - (BOOL)supportsPush;
 - (BOOL)supportsRebind;
 
 - (NSString *)rebindSessionID;
+
+- (BOOL)rebindSession:(NSString *)sessionID forJID:(XMPPJID *)jid withError:(NSError **)errPtr;
 
 @end

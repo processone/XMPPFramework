@@ -3616,7 +3616,19 @@ enum XMPPStreamConfig
 		// Done with auth
 		auth = nil;
 		
-	}
+    }
+    else if (result == XMPP_AUTH_CAN_FALLBACK)
+    {
+        // Revert back to connected state (from authenticating state)
+        state = STATE_XMPP_CONNECTED;
+        
+        // Notify delegate
+        [multicastDelegate xmppStream:self runFallbackAuthentication:authResponse];
+        
+        // Done with auth
+        auth = nil;
+        
+    }
 	else if (result == XMPP_AUTH_CONTINUE)
 	{
 		// Authentication continues.
