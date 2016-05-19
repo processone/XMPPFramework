@@ -59,7 +59,11 @@
  * If you created your project with a previous version of Xcode, you may need to add the DEBUG macro manually.
 **/
 
-#import "CocoaLumberjack/DDLog.h"
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 80000
+@import CocoaLumberjack;
+#else
+#import "CocoaLumberJack/DDLog.h"
+#endif
 
 // Global flag to enable/disable logging throughout the entire xmpp framework.
 
